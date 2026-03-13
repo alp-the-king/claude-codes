@@ -1,3 +1,4 @@
-# Icarus Verilog simulation outputs
+# Simulation outputs
 sim/*.out
 sim/*.vcd
+sim/work/
