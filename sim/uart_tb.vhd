@@ -177,8 +177,10 @@ begin
 
         if fail_count = 0 then
             report "ALL TESTS PASSED";
+            std.env.stop(0);
         else
             report "SOME TESTS FAILED" severity failure;
+            std.env.stop(1);
         end if;
         -- -------------------------------------------------------------------
 
@@ -192,6 +194,7 @@ begin
     begin
         wait for 200 ms;
         report "WATCHDOG: simulation timeout" severity failure;
+        std.env.stop(2);
         wait;
     end process;
 
