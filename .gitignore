@@ -1,0 +1,3 @@
+# Icarus Verilog simulation outputs
+sim/*.out
+sim/*.vcd
