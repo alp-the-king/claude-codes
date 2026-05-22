@@ -25,25 +25,38 @@ QAM_SRCS  := $(RTL_DIR)/qam_modulator_nr.vhd
 QAM_TB    := $(SIM_DIR)/qam_modulator_nr_tb.vhd
 QAM_VCD   := $(SIM_DIR)/qam_modulator_nr_tb.vcd
 
-.PHONY: all sim sim-uart sim-qam vcd-qam vcd-uart wave wave-uart wave-qam clean
+# ---------------------------------------------------------------------------
+# 5G NR Soft LLR Demapper (Max-Log-MAP)
+# ---------------------------------------------------------------------------
+LLR_SRCS  := $(RTL_DIR)/llr_demapper_nr.vhd
+LLR_TB    := $(SIM_DIR)/llr_demapper_nr_tb.vhd
 
-all: sim-uart sim-qam
+.PHONY: all sim sim-uart sim-qam sim-llr vcd-uart vcd-qam wave wave-uart wave-qam clean
 
-sim: sim-uart sim-qam
+all: sim-uart sim-qam sim-llr
 
-## Simulate UART
+sim: sim-uart sim-qam sim-llr
+
+## Simulate UART (no waveform dump)
 sim-uart: $(UART_SRCS) $(UART_TB)
 	@mkdir -p $(WORK_DIR)
 	$(GHDL) -a $(STD) --workdir=$(WORK_DIR) $(UART_SRCS) $(UART_TB)
 	$(GHDL) -e $(STD) --workdir=$(WORK_DIR) -o $(WORK_DIR)/uart_tb uart_tb
 	$(GHDL) -r $(STD) --workdir=$(WORK_DIR) uart_tb --stop-time=200ms
 
-## Simulate 5G NR QAM Modulator (no VCD; use 'make vcd-qam' for waveforms)
+## Simulate 5G NR QAM Modulator (no waveform dump)
 sim-qam: $(QAM_SRCS) $(QAM_TB)
 	@mkdir -p $(WORK_DIR)
 	$(GHDL) -a $(STD) --workdir=$(WORK_DIR) $(QAM_SRCS) $(QAM_TB)
 	$(GHDL) -e $(STD) --workdir=$(WORK_DIR) -o $(WORK_DIR)/qam_modulator_nr_tb qam_modulator_nr_tb
 	$(GHDL) -r $(STD) --workdir=$(WORK_DIR) qam_modulator_nr_tb
+
+## Simulate 5G NR Soft LLR Demapper (no waveform dump)
+sim-llr: $(LLR_SRCS) $(LLR_TB)
+	@mkdir -p $(WORK_DIR)
+	$(GHDL) -a $(STD) --workdir=$(WORK_DIR) $(LLR_SRCS) $(LLR_TB)
+	$(GHDL) -e $(STD) --workdir=$(WORK_DIR) -o $(WORK_DIR)/llr_demapper_nr_tb llr_demapper_nr_tb
+	$(GHDL) -r $(STD) --workdir=$(WORK_DIR) llr_demapper_nr_tb
 
 ## Run with VCD capture (for GTKWave)
 vcd-uart: $(UART_SRCS) $(UART_TB)
@@ -61,13 +74,13 @@ vcd-qam: $(QAM_SRCS) $(QAM_TB)
 	    --vcd=$(QAM_VCD)
 
 ## Open waveforms in GTKWave (run 'make vcd-*' first)
+wave: wave-uart
+
 wave-uart: $(UART_VCD)
 	gtkwave $(UART_VCD) &
 
 wave-qam: $(QAM_VCD)
 	gtkwave $(QAM_VCD) &
-
-wave: wave-uart
 
 ## Remove generated files
 clean:

@@ -1,11 +1,9 @@
 -- qam_modulator_nr.vhd
 -- 5G NR QAM Modulator -- TS 38.212 §5.1 (Modulation mapper)
 --
--- Supported modulation orders
---   mod_order = "00"  BPSK   (Qm = 1)
---   mod_order = "01"  QPSK   (Qm = 2)
---   mod_order = "10"  16-QAM (Qm = 4)
---   mod_order = "11"  64-QAM (Qm = 6)
+-- mod_order encoding
+--   "00" = BPSK   (Qm=1)   "01" = QPSK   (Qm=2)
+--   "10" = 16-QAM (Qm=4)   "11" = 64-QAM (Qm=6)
 --
 -- Input (AXI4-Stream slave, 6-bit data)
 --   s_axis_tdata(5:0) -- raw codeword bits.  Bit 0 = b0 per TS 38.212.
@@ -26,8 +24,7 @@
 -- Normalization factors (TS 38.212 §5.1.3) are baked into the LUT entries
 -- at elaboration time via ieee.math_real; no downstream scaling required.
 --
--- Latency  : 1 clock cycle (registered output)
--- Throughput: 1 symbol/cycle when m_axis_tready is held high
+-- Latency: 1 cycle.  Full throughput when m_axis_tready is held high.
 
 library ieee;
 use ieee.std_logic_1164.all;
@@ -42,9 +39,8 @@ entity qam_modulator_nr is
     );
     port (
         aclk    : in  std_logic;
-        aresetn : in  std_logic;        -- active-low synchronous reset
+        aresetn : in  std_logic;
 
-        -- Modulation order (may change every symbol)
         mod_order : in std_logic_vector(1 downto 0);
 
         -- AXI4-Stream slave -- input codeword bits
@@ -151,7 +147,6 @@ begin
         q_map <= to_fp(0, NORM_64QAM);
 
         case mod_order is
-
             when C_BPSK =>
                 -- d(i) = (1/sqrt(2))(1-2*b0)(1+j)  ->  I = Q = +/-1/sqrt(2)
                 if s_axis_tdata(0) = '1' then
@@ -161,7 +156,6 @@ begin
                     i_map <= to_fp( 1, NORM_BPSK);
                     q_map <= to_fp( 1, NORM_BPSK);
                 end if;
-
             when C_QPSK =>
                 -- I = (1-2*b0)/sqrt(2),  Q = (1-2*b1)/sqrt(2)
                 if s_axis_tdata(0) = '1' then
@@ -174,7 +168,6 @@ begin
                 else
                     q_map <= to_fp( 1, NORM_QPSK);
                 end if;
-
             when C_16QAM =>
                 i_map <= lut_16qam(s_axis_tdata(2) & s_axis_tdata(0));
                 q_map <= lut_16qam(s_axis_tdata(3) & s_axis_tdata(1));
@@ -185,7 +178,6 @@ begin
 
             when others =>
                 null;
-
         end case;
     end process p_map;
 
@@ -214,7 +206,6 @@ begin
                     out_data_r(OUTPUT_WIDTH-1 downto 0)              <= std_logic_vector(i_map);
                     out_data_r(2*OUTPUT_WIDTH-1 downto OUTPUT_WIDTH) <= std_logic_vector(q_map);
                 elsif m_axis_tready = '1' then
-                    -- Output consumed, no new input arriving
                     out_valid_r <= '0';
                 end if;
             end if;

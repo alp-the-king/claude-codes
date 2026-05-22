@@ -22,10 +22,7 @@ end entity qam_modulator_nr_tb;
 
 architecture sim of qam_modulator_nr_tb is
 
-    -- -----------------------------------------------------------------------
-    -- Constants
-    -- -----------------------------------------------------------------------
-    constant CLK_PERIOD  : time    := 10 ns;    -- 100 MHz
+    constant CLK_PERIOD  : time    := 10 ns;
     constant OUTPUT_WIDTH : natural := 8;
 
     -- -----------------------------------------------------------------------
@@ -92,48 +89,31 @@ architecture sim of qam_modulator_nr_tb is
 
 begin
 
-    -- -----------------------------------------------------------------------
-    -- Clock
-    -- -----------------------------------------------------------------------
     aclk <= not aclk after CLK_PERIOD / 2;
 
-    -- -----------------------------------------------------------------------
-    -- DUT
-    -- -----------------------------------------------------------------------
     dut : entity work.qam_modulator_nr
         generic map (OUTPUT_WIDTH => OUTPUT_WIDTH)
         port map (
-            aclk          => aclk,
-            aresetn       => aresetn,
-            mod_order     => mod_order,
-            s_axis_tdata  => s_axis_tdata,
-            s_axis_tvalid => s_axis_tvalid,
-            s_axis_tready => s_axis_tready,
-            s_axis_tlast  => s_axis_tlast,
-            m_axis_tdata  => m_axis_tdata,
-            m_axis_tvalid => m_axis_tvalid,
-            m_axis_tready => m_axis_tready,
-            m_axis_tlast  => m_axis_tlast
+            aclk => aclk, aresetn => aresetn,
+            mod_order => mod_order,
+            s_axis_tdata => s_axis_tdata, s_axis_tvalid => s_axis_tvalid,
+            s_axis_tready => s_axis_tready, s_axis_tlast => s_axis_tlast,
+            m_axis_tdata => m_axis_tdata, m_axis_tvalid => m_axis_tvalid,
+            m_axis_tready => m_axis_tready, m_axis_tlast => m_axis_tlast
         );
 
-    -- -----------------------------------------------------------------------
-    -- Stimulus / checker
-    -- -----------------------------------------------------------------------
     p_test : process
-
         variable pass_count : natural := 0;
         variable fail_count : natural := 0;
-        variable got_i      : integer;
-        variable got_q      : integer;
-        variable test_bits  : std_logic_vector(5 downto 0);
+        variable got_i, got_q : integer;
+        variable test_bits : std_logic_vector(5 downto 0);
 
         -- Send one symbol and verify the IQ output one cycle later.
         procedure send_check (
-            ord   : std_logic_vector(1 downto 0);
-            bits  : std_logic_vector(5 downto 0);
-            exp_i : integer;
-            exp_q : integer;
-            lbl   : string
+            ord : std_logic_vector(1 downto 0);
+            bits : std_logic_vector(5 downto 0);
+            exp_i, exp_q : integer;
+            lbl : string
         ) is
         begin
             mod_order     <= ord;
@@ -152,32 +132,19 @@ begin
                 report "FAIL [" & lbl & "]: m_axis_tvalid not asserted" severity error;
                 fail_count := fail_count + 1;
             elsif got_i = exp_i and got_q = exp_q then
-                report "PASS [" & lbl & "]  I=" & integer'image(got_i)
-                                              & " Q=" & integer'image(got_q)
-                    severity note;
+                report "PASS [" & lbl & "] I=" & integer'image(got_i) & " Q=" & integer'image(got_q) severity note;
                 pass_count := pass_count + 1;
             else
-                report "FAIL [" & lbl & "]"
-                    & "  got I=" & integer'image(got_i)
-                    & " Q="     & integer'image(got_q)
-                    & "  exp I=" & integer'image(exp_i)
-                    & " Q="     & integer'image(exp_q)
-                    severity error;
+                report "FAIL [" & lbl & "] got I=" & integer'image(got_i) & " Q=" & integer'image(got_q)
+                    & " exp I=" & integer'image(exp_i) & " Q=" & integer'image(exp_q) severity error;
                 fail_count := fail_count + 1;
             end if;
         end procedure send_check;
 
     begin
-
-        -- -------------------------------------------------------------------
-        -- Reset
-        -- -------------------------------------------------------------------
-        aresetn       <= '0';
-        s_axis_tvalid <= '0';
-        m_axis_tready <= '1';
+        aresetn <= '0'; s_axis_tvalid <= '0'; m_axis_tready <= '1';
         wait for 3 * CLK_PERIOD;
-        wait until rising_edge(aclk);
-        aresetn <= '1';
+        wait until rising_edge(aclk); aresetn <= '1';
         wait until rising_edge(aclk);
 
         -- -------------------------------------------------------------------
@@ -256,26 +223,19 @@ begin
 
         m_axis_tready <= '1';
         wait until rising_edge(aclk);
-
-        if m_axis_tvalid /= '1' then
-            report "FAIL [backpressure]: expected m_axis_tvalid='1' after release"
+        got_i := to_integer(signed(m_axis_tdata(OUTPUT_WIDTH-1 downto 0)));
+        got_q := to_integer(signed(m_axis_tdata(2*OUTPUT_WIDTH-1 downto OUTPUT_WIDTH)));
+        if m_axis_tvalid = '1' and got_i = ref_fp(1, NORM_64QAM) and got_q = ref_fp(1, NORM_64QAM) then
+            report "PASS [backpressure]: I=" & integer'image(got_i)
+                & " Q=" & integer'image(got_q)
+                severity note;
+            pass_count := pass_count + 1;
+        else
+            report "FAIL [backpressure]: got I=" & integer'image(got_i)
+                & " Q=" & integer'image(got_q)
+                & " exp I=Q=" & integer'image(ref_fp(1, NORM_64QAM))
                 severity error;
             fail_count := fail_count + 1;
-        else
-            got_i := to_integer(signed(m_axis_tdata(OUTPUT_WIDTH-1 downto 0)));
-            got_q := to_integer(signed(m_axis_tdata(2*OUTPUT_WIDTH-1 downto OUTPUT_WIDTH)));
-            if got_i = ref_fp(1, NORM_64QAM) and got_q = ref_fp(1, NORM_64QAM) then
-                report "PASS [backpressure]: I=" & integer'image(got_i)
-                    & " Q=" & integer'image(got_q)
-                    severity note;
-                pass_count := pass_count + 1;
-            else
-                report "FAIL [backpressure]: got I=" & integer'image(got_i)
-                    & " Q=" & integer'image(got_q)
-                    & " exp I=Q=" & integer'image(ref_fp(1, NORM_64QAM))
-                    severity error;
-                fail_count := fail_count + 1;
-            end if;
         end if;
 
         -- -------------------------------------------------------------------
@@ -291,9 +251,7 @@ begin
         else
             report "SIMULATION FAILED" severity failure;
         end if;
-
         wait;
-
     end process p_test;
 
 end architecture sim;
