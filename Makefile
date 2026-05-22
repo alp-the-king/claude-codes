@@ -1,38 +1,61 @@
-# Makefile for UART with programmable baud rate (VHDL)
+# Makefile for HDL modules (VHDL, GHDL)
 # Requires: GHDL  https://github.com/ghdl/ghdl
 # Optional: GTKWave for waveform viewing
 
 RTL_DIR  := rtl
 SIM_DIR  := sim
-
-RTL_SRCS := $(RTL_DIR)/uart_baud_gen.vhd \
-            $(RTL_DIR)/uart_tx.vhd        \
-            $(RTL_DIR)/uart_rx.vhd        \
-            $(RTL_DIR)/uart.vhd
-
-TB_SRC   := $(SIM_DIR)/uart_tb.vhd
-
 WORK_DIR := $(SIM_DIR)/work
-VCD_FILE := $(SIM_DIR)/uart_tb.vcd
 GHDL     := ghdl
 STD      := --std=08
 
-.PHONY: all sim wave clean
+# ---------------------------------------------------------------------------
+# UART with programmable baud rate
+# ---------------------------------------------------------------------------
+UART_SRCS := $(RTL_DIR)/uart_baud_gen.vhd \
+             $(RTL_DIR)/uart_tx.vhd        \
+             $(RTL_DIR)/uart_rx.vhd        \
+             $(RTL_DIR)/uart.vhd
+UART_TB   := $(SIM_DIR)/uart_tb.vhd
+UART_VCD  := $(SIM_DIR)/uart_tb.vcd
 
-all: sim
+# ---------------------------------------------------------------------------
+# 5G NR QAM Modulator (TS 38.212)
+# ---------------------------------------------------------------------------
+QAM_SRCS  := $(RTL_DIR)/qam_modulator_nr.vhd
+QAM_TB    := $(SIM_DIR)/qam_modulator_nr_tb.vhd
+QAM_VCD   := $(SIM_DIR)/qam_modulator_nr_tb.vcd
 
-## Analyse, elaborate, and run the simulation
-sim: $(RTL_SRCS) $(TB_SRC)
+.PHONY: all sim sim-uart sim-qam wave wave-uart wave-qam clean
+
+all: sim-uart sim-qam
+
+sim: sim-uart sim-qam
+
+## Simulate UART
+sim-uart: $(UART_SRCS) $(UART_TB)
 	@mkdir -p $(WORK_DIR)
-	$(GHDL) -a $(STD) --workdir=$(WORK_DIR) $(RTL_SRCS) $(TB_SRC)
+	$(GHDL) -a $(STD) --workdir=$(WORK_DIR) $(UART_SRCS) $(UART_TB)
 	$(GHDL) -e $(STD) --workdir=$(WORK_DIR) -o $(WORK_DIR)/uart_tb uart_tb
 	$(GHDL) -r $(STD) --workdir=$(WORK_DIR) uart_tb \
-	    --vcd=$(VCD_FILE) --stop-time=200ms
+	    --vcd=$(UART_VCD) --stop-time=200ms
 
-## Open waveform in GTKWave (run 'make sim' first)
-wave: $(VCD_FILE)
-	gtkwave $(VCD_FILE) &
+## Simulate 5G NR QAM Modulator
+sim-qam: $(QAM_SRCS) $(QAM_TB)
+	@mkdir -p $(WORK_DIR)
+	$(GHDL) -a $(STD) --workdir=$(WORK_DIR) $(QAM_SRCS) $(QAM_TB)
+	$(GHDL) -e $(STD) --workdir=$(WORK_DIR) -o $(WORK_DIR)/qam_modulator_nr_tb qam_modulator_nr_tb
+	$(GHDL) -r $(STD) --workdir=$(WORK_DIR) qam_modulator_nr_tb \
+	    --vcd=$(QAM_VCD)
+
+## Open waveforms in GTKWave
+wave: wave-uart
+
+wave-uart: $(UART_VCD)
+	gtkwave $(UART_VCD) &
+
+wave-qam: $(QAM_VCD)
+	gtkwave $(QAM_VCD) &
 
 ## Remove generated files
 clean:
-	rm -rf $(WORK_DIR) $(VCD_FILE)
+	rm -rf $(WORK_DIR) $(UART_VCD) $(QAM_VCD)
